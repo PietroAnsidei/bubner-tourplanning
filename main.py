@@ -7,12 +7,12 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 
 def create_data_model(distances, num_vehicles):
-    """Stores the data for the problem."""
+    """Prepare data for OrTools."""
     return {"distance_matrix": distances, "num_vehicles": num_vehicles, "depot": 0}
 
 
 def print_solution(no_to_customer_id_dict, data, manager, routing, solution):
-    """Prints solution on console."""
+    """Print solution on console."""
     print(f"Objective: {solution.ObjectiveValue()}")
     max_route_distance = 0
     sum_distances = 0
@@ -45,7 +45,7 @@ def solve_distances(
     vehicle_max_dist,  # in km
     distance_global_span_cost_coefficient,
 ):
-    """Entry point of the program."""
+    """Solve distance problem."""
     # Instantiate the data problem.
     data_ort = create_data_model(distances, num_vehicles)
 
@@ -59,7 +59,7 @@ def solve_distances(
 
     # Create and register a transit callback.
     def distance_callback(from_index, to_index):
-        """Returns the distance between the two nodes."""
+        """Return distance between two nodes."""
         # Convert from routing variable Index to distance matrix NodeIndex.
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
