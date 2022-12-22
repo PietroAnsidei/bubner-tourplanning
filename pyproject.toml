@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "bubner-tourplanning"
+version = "0.1.0"
+description = "Tour Planner for Bäckerei Bubner"
+authors = ["PietroAnsidei <pietro.ansidei@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+openpyxl = "^3.0.10"
+pandas = "^1.5.2"
+requests = "^2.28.1"
+ortools = "^9.5.2237"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
