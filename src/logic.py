@@ -5,9 +5,12 @@ import pickle
 import pandas as pd
 import requests
 
+from src.setup import logger
+
 
 def data_import(params):
     """Import and preprocess data."""
+    logger.info("Importing data from source.")
     # Import data
     stops_df = pd.read_excel(
         f"{params['data_folder']}/{params['data_file']}",
@@ -50,6 +53,7 @@ def data_import(params):
 
 def data_load(params):
     """Load data from storage."""
+    logger.info("Loading data from storage.")
     # Fetch data
     df = pd.read_pickle(f"{params['data_folder']}/{params['data_locations']}")
 
