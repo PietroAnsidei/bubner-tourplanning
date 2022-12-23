@@ -14,5 +14,9 @@ params = {
     # URLs
     "url_distance": "http://router.project-osrm.org/table/v1/driving/",
     # Options
+    "num_vehicles": 7,
+    "max_distance_vehicles_km": 1000,
+    "pen_distance_vehicle_factor": 0,
+    "max_legs": 4,
     "reload": True,
 }
