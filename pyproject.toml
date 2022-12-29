@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bubner-tourplanning"
 version = "0.2.0"
-description = "Tour Planner for Bckerei Bubner"
+description = "Tour Planner for Bäckerei Bubner"
 authors = ["PietroAnsidei <pietro.ansidei@gmail.com>"]
 
 [tool.poetry.dependencies]
