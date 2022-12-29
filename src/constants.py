@@ -1,4 +1,5 @@
 """Constants."""
+from datetime import time
 
 params = {
     # Define paths
@@ -14,9 +15,14 @@ params = {
     # URLs
     "url_distance": "http://router.project-osrm.org/table/v1/driving/",
     # Options
-    "num_vehicles": 7,
-    "max_distance_vehicles_km": 1000,
-    "pen_distance_vehicle_factor": 0,
-    "max_legs": 4,
     "reload": True,
+    "solve_by_distance": True,
+    "num_vehicles": 7,
+    "leave_time": time(2, 45),
+    "max_distance_vehicles_km": 1000,
+    "cost_coefficient": 100,
+    "max_time_tour_h": 2.75,
+    "pen_distance_vehicle_factor": 0,
+    "slack_time_min": 30,
+    "max_legs": 4,
 }
