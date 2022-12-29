@@ -2,4 +2,5 @@ poetry.lock
 data/*
 Bakery_tours*
 .DS_Store
+.idea/
 .idea/*
