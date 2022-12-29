@@ -1,6 +1,7 @@
 """Logic."""
 import os
 import pickle
+from datetime import date, datetime
 
 import pandas as pd
 import requests
@@ -60,6 +61,16 @@ def data_load(params):
     return df, response
 
 
+def delay_from_leave_time(params, ts):
+    """Compare timestamp with leave time and return difference in minutes."""
+    return int(
+        (
+            datetime.combine(date.min, max(ts, params["leave_time"]))
+            - datetime.combine(date.min, params["leave_time"])
+        ).seconds
+    )
+
+
 def data_etl(params):
     """Preprocess data."""
     if (
@@ -77,8 +88,20 @@ def data_etl(params):
         **pd.Series(df["Customer ID"].values, index=1 + df.index).to_dict(),
     }
 
-    # Distance and time matrices
-    distances = response.json()["distances"]
-    # durations = response.json()["durations"]
+    # Distance and time matrices - convert to int ([m] and [s])
+    distances = [[int(j) for j in i] for i in response.json()["distances"]]
+    durations = [[int(j) for j in i] for i in response.json()["durations"]]
 
-    return params, distances
+    # Time windows
+    df["delay_reach"] = (
+        df["Time from"].apply(lambda x: delay_from_leave_time(params, x)).tolist()
+    )
+    df["delay_leave"] = (
+        df["Time to"].apply(lambda x: delay_from_leave_time(params, x)).tolist()
+    )
+
+    params["time_windows"] = [
+        (0, int(params["max_time_tour_h"] * 3600)),  # depot
+    ] + list(df[["delay_reach", "delay_leave"]].itertuples(index=False, name=None))
+
+    return params, distances, durations

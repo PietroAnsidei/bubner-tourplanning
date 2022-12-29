@@ -1,6 +1,6 @@
 """Main optimizer."""
 from src.logic import data_etl
-from src.ort_utils import solve_distances
+from src.ort_utils import solve_distances, solve_durations
 from src.setup import setup_params
 
 if __name__ == "__main__":
@@ -8,7 +8,10 @@ if __name__ == "__main__":
     params = setup_params()
 
     # ETL
-    params, distances = data_etl(params)
+    params, distances, durations = data_etl(params)
 
     # Solver
-    solve_distances(params, distances, 7, 1000, 100)
+    if params["solve_by_distance"]:
+        solve_distances(params, distances)
+    else:
+        solve_durations(params, durations)

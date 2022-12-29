@@ -1,0 +1,18 @@
+OSRM API
+https://project-osrm.org/docs/v5.22.0/api/#general-options
+
+OR-Tools
+https://developers.google.com/optimization/routing/cvrptw_resources
+
+Pick-ups
+https://stackoverflow.com/questions/73401608/or-tools-cvrp-reload-with-pickup-delivery
+https://github.com/google/or-tools/blob/stable/ortools/constraint_solver/samples/cvrp_reload.py
+
+Min/max number of stops:
+https://github.com/google/or-tools/issues/1142
+https://stackoverflow.com/questions/65880767/how-to-set-minimum-locations-per-route-in-google-or-tools
+https://stackoverflow.com/questions/62756122/how-to-limit-number-of-locations-for-each-vehicle-in-google-or-tools-route-optim
+
+SetGlobalSpanCostCoefficient:
+https://stackoverflow.com/questions/58265400/how-to-set-setglobalspancostcoefficient-and-the-capacity-parameter-in-adddimensi
+https://stackoverflow.com/questions/50351017/the-intuition-behind-the-globalspancoefficient
