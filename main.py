@@ -1,6 +1,6 @@
 """Main optimizer."""
 from src.logic import data_etl
-from src.ort_utils import solve_distances, solve_durations
+from src.ort_utils import solve_vrp, solve_vrptw
 from src.setup import setup_params
 
 if __name__ == "__main__":
@@ -12,6 +12,6 @@ if __name__ == "__main__":
 
     # Solver
     if params["solve_by_distance"]:
-        solve_distances(params, distances)
+        solve_vrp(params, distances)
     else:
-        solve_durations(params, durations)
+        solve_vrptw(params, durations)
