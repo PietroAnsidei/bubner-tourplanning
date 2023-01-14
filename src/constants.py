@@ -17,12 +17,14 @@ params = {
     # Options
     "reload": True,
     "solve_by_distance": True,
-    "num_vehicles": 7,
-    "leave_time": time(2, 45),
+    "constrain_tw": True,
+    "constrain_cap": True,
+    "max_search_time_min": 10,
+    "num_vehicles": 7,  # Lisa
+    "max_legs": 4,  # Lisa
+    "leave_time": time(2, 45),  # Lisa
     "max_distance_vehicles_km": 1000,
-    "cost_coefficient": 100,
-    "max_time_tour_h": 2.75,
+    "max_time_tour_h": 7,  # Lisa
     "pen_distance_vehicle_factor": 0,
-    "slack_time_min": 30,
-    "max_legs": 4,
+    "slack_time_max_h": 1,
 }
