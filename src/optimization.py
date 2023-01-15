@@ -17,15 +17,16 @@ def create_data_model(
         len(distance_matrix) if distance_matrix is not None else len(durations_matrix)
     )
     data = {
+        "depot": 0,  # Start and destination node for all the tours
         "distance_matrix": distance_matrix,
         "time_matrix": durations_matrix,
         "num_locations": num_locations,
         "num_vehicles": params["num_vehicles"],
         "service_time": params["service_time"],
         "demands": params["demands"],
+        "pickups": params["pickups"],
         "vehicle_capacities": [params["max_legs"]] * params["num_vehicles"],
         "time_windows": time_windows,
-        "depot": 0,  # Start and destination node for all the tours
     }
     return data
 
@@ -164,6 +165,27 @@ def constrain_time_windows(manager, routing, time_dim, data_ort):
     return routing
 
 
+def constrain_pickup(params, manager, routing, time_dim, data_ort):
+    """Add pickup time constraints."""
+    # Add constraint to each pickup rule
+    for request in data_ort["pickups"]:
+
+        # Collect location indexes
+        delivery_index = manager.NodeToIndex(request[0])
+        pickup_index = manager.NodeToIndex(request[1])
+
+        # Create pickup-delivery request
+        routing.AddPickupAndDelivery(delivery_index, pickup_index)
+
+        # Impose that pickup should happen after delivery (with a slack)
+        routing.solver().Add(
+            time_dim.CumulVar(pickup_index)
+            >= time_dim.CumulVar(delivery_index)
+            + int(3600 * params["slack_time_max_h"])
+        )
+    return routing
+
+
 def solver(params, routing):
     """Solve optimization problem."""
     # Setting first solution heuristic.
@@ -187,6 +209,7 @@ def print_solution(params, data, manager, routing, solution):
     sum_total_distances = 0
     max_route_time = 0
     sum_total_time = 0
+    vehicle_idx = 0
 
     # Print travel for each vehicle
     for vehicle_id in range(data["num_vehicles"]):
@@ -194,8 +217,11 @@ def print_solution(params, data, manager, routing, solution):
         # Initialize travel
         route_distance = 0
         route_load = 0
+        n_stores = 0
+        n_customers = 0
+        n_pickups = 0
         index = routing.Start(vehicle_id)
-        out_str = f"Route for vehicle {vehicle_id}:\n"
+        out_str = f"Route for vehicle {vehicle_idx}:\n"
 
         # Define next leg of the travel
         while not routing.IsEnd(index):
@@ -208,10 +234,21 @@ def print_solution(params, data, manager, routing, solution):
             time_min = datetime.combine(date.min, params["leave_time"]) + timedelta(
                 seconds=solution.Min(time_var)
             )
-            time_max = datetime.combine(date.min, params["leave_time"]) + timedelta(
-                seconds=solution.Max(time_var)
-            )
+
             route_load += data["demands"][node_index]
+
+            # Define leg content
+            if data["demands"][node_index] == -1:
+                n_stores += 1
+                activity = "Unload @ store"
+            elif data["demands"][node_index] == -0.1:
+                n_customers += 1
+                activity = "Unload @ customer"
+            elif data["demands"][node_index] == 0.01:
+                n_pickups += 1
+                activity = "Pickup @ store"
+            else:
+                activity = "Load @ depot"
 
             # Define leg end
             previous_node = manager.IndexToNode(index)
@@ -223,9 +260,10 @@ def print_solution(params, data, manager, routing, solution):
             route_distance += leg_distance
 
             out_str += (
-                f"\t{node_index} ({node_label}): "
-                f"Departure Time ({time_min.time()}, {time_max.time()}), "
-                f"Load ({route_load:.1f}) -> {leg_distance:.3f} km\n"
+                f"\tNode {node_index} ({node_label}): {activity} -> "
+                f"Current Load ({route_load:.2f}) -> "
+                f"ETD {time_min.time()} -> "
+                f"Drive {leg_distance:.3f} km to -->\n"
             )
 
         # Terminate route
@@ -236,26 +274,21 @@ def print_solution(params, data, manager, routing, solution):
         time_min = datetime.combine(date.min, params["leave_time"]) + timedelta(
             seconds=solution.Min(time_var)
         )
-        time_max = datetime.combine(date.min, params["leave_time"]) + timedelta(
-            seconds=solution.Max(time_var)
-        )
         route_load += data["demands"][node_index]
 
-        legs = 2 * params["max_legs"] - route_load
-        stores_served = int(legs)
-        customers_served = int(10 * (legs - stores_served))
-
         out_str += (
-            f"\t{node_index} ({node_label}): "
-            f"Arrival Time ({time_min.time()}, {time_max.time()}), "
-            f"after {stores_served} stores and {customers_served} customers served.\n"
+            f"\tNode {node_index} ({node_label}): End journey @ depot -> "
+            f"ETA {time_min.time()} after serving "
+            f"{n_stores} stores, {n_customers} customers and {n_pickups} pickups.\n"
         )
-        out_str += f"Distance of the route: {route_distance:.3f} km.\n"
+        out_str += f"Total route distance: {route_distance:.3f} km.\n"
 
         route_time = int(solution.Min(time_var) / 60)
-        out_str += f"Time of the route: {route_time} min\n"
+        out_str += f"Total route time: {route_time} min\n"
 
-        logger.info(out_str)
+        if route_time > 0:
+            logger.info(out_str)
+            vehicle_idx += 1
 
         # Update distances
         max_route_distance = max(route_distance, max_route_distance)
@@ -265,9 +298,10 @@ def print_solution(params, data, manager, routing, solution):
         max_route_time = max(route_time, max_route_time)
         sum_total_time += route_time
 
-    logger.info(f"Maximum of the route distances: {max_route_distance:.3f} km.")
+    logger.info(f"Total number of vehicles used: {vehicle_idx}.")
+    logger.info(f"Longest route distance: {max_route_distance:.3f} km.")
     logger.info(f"Sum of the route distances: {sum_total_distances:.3f} km.")
-    logger.info(f"Maximum of the route time: {max_route_time} min.")
+    logger.info(f"Longest route time: {max_route_time} min.")
     logger.info(f"Sum of the route durations: {sum_total_time} min.")
 
     return
@@ -303,6 +337,9 @@ def solve_vr(params, distances, durations):
 
     if params["constrain_cap"]:
         routing = constrain_capacity(manager, routing, data_ort)
+
+    if not params["only_delivery"]:
+        routing = constrain_pickup(params, manager, routing, time_dim, data_ort)
 
     # Compute solution
     solution = solver(params, routing)

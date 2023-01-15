@@ -35,18 +35,19 @@ def data_import(params):
         f"{params['data_folder']}/{params['data_file']}",
         sheet_name=params["data_sheet"],
         engine="openpyxl",
-        converters={"Postal Code": str},
+        converters={"Customer ID": str, "Postal Code": str, "Dependency": int},
     )
 
-    # Extract only store-delivery and check uniqueness
-    df = stops_df[(stops_df.Type == "Delivery")]
+    # Filter data by options
+    df = stops_df.copy()
+
+    # Extract only delivery
+    if params["only_delivery"]:
+        df = df[df.Type == "Delivery"].copy()
 
     # Filter only stores and not customer delivery
     if params["only_stores"]:
-        df = df[df["Stop type"] == "Store"]
-
-    unique_customers = df["Customer ID"].unique()
-    assert len(unique_customers) == df.shape[0]
+        df = df[df["Stop type"] == "Store"].copy()
 
     # Add service time along the route
     service_duration_s = (
@@ -64,6 +65,18 @@ def data_import(params):
 
     # Add capacity requests
     df["capacity"] = df["Stop type"].replace({"Customer Delivery": -0.1, "Store": -1})
+    df.loc[df.Type == "Pickup", "capacity"] = 0.01
+
+    # Add pickup time requests
+    df["delayed_time_to"] = df["Time to"].apply(
+        lambda x: (
+            datetime.combine(datetime.today(), x)
+            + timedelta(hours=params["pickup_delay_h"])
+        ).time()
+    )
+    df.loc[df.Type == "Pickup", "Time to"] = df.loc[
+        df.Type == "Pickup", "delayed_time_to"
+    ]
 
     # Extract Latitude and Longitude data
     # Customers: fetch Latitude and Longitude data from full address
@@ -89,7 +102,7 @@ def data_import(params):
     lat_lon = lat_lon_str.fillna(lat_lon_addr)
 
     # Merge dataframes
-    df = df.join(lat_lon).drop("Latitude, Longitude", axis=1).reset_index()
+    df = df.join(lat_lon).drop("Latitude, Longitude", axis=1)
 
     # The format for OSRM is longitude/latitude, not latitude/longitude
     req_str = ";".join(
@@ -171,5 +184,12 @@ def data_etl(params):
 
     # Capacity
     params["demands"] = [params["max_legs"]] + df.capacity.tolist()
+
+    # Pickup dependency (notice that delivery comes first). Add 1 for the depot index.
+    params["pickups"] = [
+        [df.index[df.No == loc.Dependency][0] + 1, idx + 1]
+        for idx, loc in df.iterrows()
+        if loc.Type == "Pickup"
+    ]
 
     return params, distances, durations
