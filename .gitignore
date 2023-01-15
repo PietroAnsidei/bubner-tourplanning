@@ -5,3 +5,5 @@ Bakery_tours*
 .DS_Store
 .idea/
 .idea/*
+cache/
+cache/*
