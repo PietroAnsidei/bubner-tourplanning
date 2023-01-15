@@ -14,5 +14,4 @@ if __name__ == "__main__":
     solve_vr(params, distances, durations)
 
 # TODO: cover the following use cases:
-#  - add pickup constraints (should happen after delivery) + max 4 legs (?)
-#  - add customer delivery
+#  - add pickup constraints (should happen after delivery)

@@ -22,7 +22,7 @@ def create_data_model(
         "num_locations": num_locations,
         "num_vehicles": params["num_vehicles"],
         "service_time": params["service_time"],
-        "demands": [params["max_legs"]] + [-1] * (num_locations - 1),
+        "demands": params["demands"],
         "vehicle_capacities": [params["max_legs"]] * params["num_vehicles"],
         "time_windows": time_windows,
         "depot": 0,  # Start and destination node for all the tours
@@ -224,8 +224,8 @@ def print_solution(params, data, manager, routing, solution):
 
             out_str += (
                 f"\t{node_index} ({node_label}): "
-                f"Departure Time ({time_min.time()}, {time_max.time()})), "
-                f"Load ({route_load}) -> {leg_distance:.3f} km\n"
+                f"Departure Time ({time_min.time()}, {time_max.time()}), "
+                f"Load ({route_load:.1f}) -> {leg_distance:.3f} km\n"
             )
 
         # Terminate route
@@ -241,10 +241,14 @@ def print_solution(params, data, manager, routing, solution):
         )
         route_load += data["demands"][node_index]
 
+        legs = 2 * params["max_legs"] - route_load
+        stores_served = int(legs)
+        customers_served = int(10 * (legs - stores_served))
+
         out_str += (
             f"\t{node_index} ({node_label}): "
-            f"Arrival Time ({time_min.time()}, {time_max.time()})), "
-            f"Load ({route_load})\n"
+            f"Arrival Time ({time_min.time()}, {time_max.time()}), "
+            f"after {stores_served} stores and {customers_served} customers served.\n"
         )
         out_str += f"Distance of the route: {route_distance:.3f} km.\n"
 
@@ -271,6 +275,8 @@ def print_solution(params, data, manager, routing, solution):
 
 def solve_vr(params, distances, durations):
     """Solve generic parametrize VRP."""
+    logger.info("Starting optimization.")
+
     # Instantiate the data model.
     data_ort = create_data_model(
         params,
