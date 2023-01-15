@@ -5,22 +5,45 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 import requests
+from geopy.geocoders import Nominatim
 
 from src.setup import logger
+
+
+def address_to_lat_lon(address):
+    """Fetch latitude and longitude string from address."""
+    # Import nominatim for address research
+    geolocator = Nominatim(user_agent="Bubner_Tourplanning")
+
+    # Execute query
+    location = geolocator.geocode(address)
+
+    # In case of failure with the address, just add the town
+    if location is None:
+        address = ", ".join(address.split(", ")[1:])
+        location = geolocator.geocode(address)
+
+    return location.latitude, location.longitude
 
 
 def data_import(params):
     """Import and preprocess data."""
     logger.info("Importing data from source.")
+
     # Import data
     stops_df = pd.read_excel(
         f"{params['data_folder']}/{params['data_file']}",
         sheet_name=params["data_sheet"],
         engine="openpyxl",
+        converters={"Postal Code": str},
     )
 
     # Extract only store-delivery and check uniqueness
-    df = stops_df[(stops_df.Type == "Delivery") & (stops_df["Stop type"] == "Store")]
+    df = stops_df[(stops_df.Type == "Delivery")]
+
+    # Filter only stores and not customer delivery
+    if params["only_stores"]:
+        df = df[df["Stop type"] == "Store"]
 
     unique_customers = df["Customer ID"].unique()
     assert len(unique_customers) == df.shape[0]
@@ -39,12 +62,33 @@ def data_import(params):
     )
     df = df.join(service_duration_s).drop("Duration (in min)", axis=1)
 
-    # Split Latitude and Longitude and store them in df
-    lat_lon = pd.DataFrame(
-        df["Latitude, Longitude"].apply(lambda x: x.split(", ")).tolist(),
+    # Add capacity requests
+    df["capacity"] = df["Stop type"].replace({"Customer Delivery": -0.1, "Store": -1})
+
+    # Extract Latitude and Longitude data
+    # Customers: fetch Latitude and Longitude data from full address
+    df["Municipality"] = df["Town"].apply(lambda x: x.split("OT")[0])
+    df["full_address"] = df[["Address", "Postal Code", "Municipality"]].agg(
+        ", ".join, axis=1
+    )
+    lat_lon_addr = pd.DataFrame(
+        df.full_address.apply(lambda x: address_to_lat_lon(x)).tolist(),
+        index=df.index,
+        columns=["Latitude", "Longitude"],
+    )
+
+    # Stores: split Latitude and Longitude and store them in df
+    lat_lon_str = pd.DataFrame(
+        df["Latitude, Longitude"]
+        .apply(lambda x: x.split(", ") if isinstance(x, str) else (x, x))
+        .tolist(),
         index=df.index,
         columns=["Latitude", "Longitude"],
     ).astype(float)
+
+    lat_lon = lat_lon_str.fillna(lat_lon_addr)
+
+    # Merge dataframes
     df = df.join(lat_lon).drop("Latitude, Longitude", axis=1).reset_index()
 
     # The format for OSRM is longitude/latitude, not latitude/longitude
@@ -124,5 +168,8 @@ def data_etl(params):
     ] + list(df[["delay_reach", "delay_leave"]].itertuples(index=False, name=None))
 
     params["service_time"] = [0] + df.service_duration_s.tolist()
+
+    # Capacity
+    params["demands"] = [params["max_legs"]] + df.capacity.tolist()
 
     return params, distances, durations
