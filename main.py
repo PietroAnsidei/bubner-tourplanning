@@ -1,6 +1,6 @@
 """Main optimizer."""
-from src.logic import data_etl
-from src.ort_utils import solve_vr
+from src.etl import data_etl
+from src.optimization import solve_vr
 from src.setup import setup_params
 
 if __name__ == "__main__":

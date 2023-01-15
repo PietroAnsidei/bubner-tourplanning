@@ -100,7 +100,7 @@ def register_duration(params, manager, routing, data_ort):
         transit_callback_index,
         int(params["slack_time_max_h"] * 3600),  # allow max waiting time
         int(params["max_time_tour_h"] * 3600),  # maximum time per vehicle [min]
-        False,  # Don't force start cumul to zero.
+        False,  # Don't force time to start cumulate from zero.
         time,
     )
     time_dimension = routing.GetDimensionOrDie(time)
@@ -118,7 +118,7 @@ def constrain_capacity(manager, routing, data_ort):
     # the demand callback only depends on the location (from_node) of the delivery.
     def demand_callback(from_index):
         """Return the demand of the node."""
-        # Convert from routing variable Index to demands NodeIndex.
+        # Convert from routing variable's Index to NodeIndex of demand.
         from_node = manager.IndexToNode(from_index)
         return data_ort["demands"][from_node]
 

@@ -25,6 +25,7 @@ def data_import(params):
     unique_customers = df["Customer ID"].unique()
     assert len(unique_customers) == df.shape[0]
 
+    # Add service time along the route
     service_duration_s = (
         df["Duration (in min)"]
         .apply(
@@ -90,6 +91,7 @@ def delay_from_leave_time(params, ts):
 
 def data_etl(params):
     """Preprocess data."""
+    # Import data from file (if existing and not required differently)
     if (
         os.path.exists(f"{params['data_folder']}/{params['data_locations']}")
         and os.path.exists(f"{params['data_folder']}/{params['data_distances']}")
