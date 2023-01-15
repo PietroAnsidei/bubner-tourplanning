@@ -10,8 +10,8 @@ logging.Formatter.converter = time.gmtime
 # Set standard output and standard error for the logs
 logger = logging.getLogger("__name__")
 logger.setLevel(logging.INFO)
-format = "%(asctime)s [%(levelname)s] %(message)s"
-formatter = logging.Formatter(format)
+log_format = "%(asctime)s [%(levelname)s] %(message)s"
+formatter = logging.Formatter(log_format)
 
 h1 = logging.StreamHandler(sys.stdout)
 h1.setLevel(logging.INFO)

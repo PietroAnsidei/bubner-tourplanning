@@ -1,7 +1,7 @@
 """Logic."""
 import os
 import pickle
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import requests
@@ -24,6 +24,20 @@ def data_import(params):
 
     unique_customers = df["Customer ID"].unique()
     assert len(unique_customers) == df.shape[0]
+
+    # Add service time along the route
+    service_duration_s = (
+        df["Duration (in min)"]
+        .apply(
+            lambda t: int(
+                timedelta(
+                    hours=t.hour, minutes=t.minute, seconds=t.second
+                ).total_seconds()
+            )
+        )
+        .rename("service_duration_s")
+    )
+    df = df.join(service_duration_s).drop("Duration (in min)", axis=1)
 
     # Split Latitude and Longitude and store them in df
     lat_lon = pd.DataFrame(
@@ -77,6 +91,7 @@ def delay_from_leave_time(params, ts):
 
 def data_etl(params):
     """Preprocess data."""
+    # Import data from file (if existing and not required differently)
     if (
         os.path.exists(f"{params['data_folder']}/{params['data_locations']}")
         and os.path.exists(f"{params['data_folder']}/{params['data_distances']}")
@@ -107,5 +122,7 @@ def data_etl(params):
     params["time_windows"] = [
         (0, int(params["max_time_tour_h"] * 3600)),  # depot
     ] + list(df[["delay_reach", "delay_leave"]].itertuples(index=False, name=None))
+
+    params["service_time"] = [0] + df.service_duration_s.tolist()
 
     return params, distances, durations

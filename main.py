@@ -1,6 +1,6 @@
 """Main optimizer."""
-from src.logic import data_etl
-from src.ort_utils import solve_vrp, solve_vrptw
+from src.etl import data_etl
+from src.optimization import solve_vr
 from src.setup import setup_params
 
 if __name__ == "__main__":
@@ -11,7 +11,8 @@ if __name__ == "__main__":
     params, distances, durations = data_etl(params)
 
     # Solver
-    if params["solve_by_distance"]:
-        solve_vrp(params, distances)
-    else:
-        solve_vrptw(params, durations)
+    solve_vr(params, distances, durations)
+
+# TODO: cover the following use cases:
+#  - add pickup constraints (should happen after delivery) + max 4 legs (?)
+#  - add customer delivery
