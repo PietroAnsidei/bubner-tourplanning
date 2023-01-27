@@ -4,9 +4,10 @@ from datetime import time
 params = {
     # Define paths
     "data_folder": "data",
-    "data_file": "Data.xlsx",
+    "data_file": "Data2.xlsx",
     "data_locations": "osrm_data.pkl",
     "data_distances": "osrm_response.pkl",
+    "output_file": "Output.xlsx",
     # ETL
     "reload": True,
     "data_sheet": "Stops 1.Tour (Mo-Fr)",
@@ -29,10 +30,14 @@ params = {
     "num_vehicles": 10,
     "max_legs": 4.44,  # Allow 4 store- (1), 4 customer- (0.1), 4 pickup-legs(0.01)
     "leave_time": time(2, 45),
-    "max_time_tour_h": 7,
-    "pickup_delay_h": 0,  # Allow max delay on the ETA (Time to) for pickup
+    "max_time_tour_h": 10,
+    "pickup_opening_delay_h": 6,  # Allow max delay on the ETA (Time to) for pickup
     # Other parameters
-    "max_distance_vehicles_km": 1000,  # For each vehicle's route
+    "max_distance_vehicles_km": 200,  # For each vehicle's route
     "pen_distance_vehicle_factor": 0,  # To penalize the max of the routes lengths
-    "slack_time_max_h": 0.5,  # Max allowed stopping time at location + min pickup delay
+    "slack_time_max_h": 4,  # Max allowed stopping time at location
+    "min_pickup_delay_h": 0.5,  # min pickup delay
+    # Comparison health check
+    "id_to_remove": [],  # ['141', '142', '143', '144', '145', '146', '9008', '9027'],
+    "pickup_to_remove": [],  # ['9023']
 }

@@ -1,6 +1,7 @@
 """OrTools utilities."""
 from datetime import date, datetime, timedelta
 
+import pandas as pd
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 from src.setup import logger
@@ -181,7 +182,8 @@ def constrain_pickup(params, manager, routing, time_dim, data_ort):
         routing.solver().Add(
             time_dim.CumulVar(pickup_index)
             >= time_dim.CumulVar(delivery_index)
-            + int(3600 * params["slack_time_max_h"])
+            + data_ort["service_time"][request[1]]
+            + int(3600 * params["min_pickup_delay_h"])
         )
     return routing
 
@@ -201,7 +203,7 @@ def solver(params, routing):
 
 
 def print_solution(params, data, manager, routing, solution):
-    """Print solution on console."""
+    """Print solution on console and file."""
     # Init constants
     time_dimension = routing.GetDimensionOrDie("Time")
 
@@ -210,6 +212,9 @@ def print_solution(params, data, manager, routing, solution):
     max_route_time = 0
     sum_total_time = 0
     vehicle_idx = 0
+    output_df_columns = ["Stop ID", "Stop type", "Action", "ETA", "ETD", "Distance"]
+    output_df_base = pd.DataFrame(columns=output_df_columns)
+    output_df_list = []
 
     # Print travel for each vehicle
     for vehicle_id in range(data["num_vehicles"]):
@@ -220,7 +225,10 @@ def print_solution(params, data, manager, routing, solution):
         n_stores = 0
         n_customers = 0
         n_pickups = 0
+        previous_ETD = None
+        next_leg_duration = None
         index = routing.Start(vehicle_id)
+        output_df = output_df_base.copy()
         out_str = f"Route for vehicle {vehicle_idx}:\n"
 
         # Define next leg of the travel
@@ -228,27 +236,37 @@ def print_solution(params, data, manager, routing, solution):
 
             # Define leg start
             node_index = manager.IndexToNode(index)
-            node_label = params["stop_id_map"][node_index]
-
-            time_var = time_dimension.CumulVar(index)
-            time_min = datetime.combine(date.min, params["leave_time"]) + timedelta(
-                seconds=solution.Min(time_var)
-            )
-
-            route_load += data["demands"][node_index]
+            route_leg = {"Stop ID": params["stop_id_map"][node_index]}
 
             # Define leg content
             if data["demands"][node_index] == -1:
                 n_stores += 1
-                activity = "Unload @ store"
+                route_leg["Action"] = "Unload"
+                route_leg["Stop type"] = "store"
             elif data["demands"][node_index] == -0.1:
                 n_customers += 1
-                activity = "Unload @ customer"
+                route_leg["Action"] = "Unload"
+                route_leg["Stop type"] = "customer"
             elif data["demands"][node_index] == 0.01:
                 n_pickups += 1
-                activity = "Pickup @ store"
+                route_leg["Action"] = "Pickup"
+                route_leg["Stop type"] = "store"
             else:
-                activity = "Load @ depot"
+                route_leg["Action"] = "Load"
+                route_leg["Stop type"] = "depot"
+
+            route_load += data["demands"][node_index]
+
+            time_var = time_dimension.CumulVar(index)
+            if output_df.shape[0]:
+                route_leg["ETA"] = (
+                    datetime.combine(date.min, previous_ETD)
+                    + timedelta(seconds=next_leg_duration)
+                ).time()
+            route_leg["ETD"] = (
+                datetime.combine(date.min, params["leave_time"])
+                + timedelta(seconds=solution.Min(time_var))
+            ).time()
 
             # Define leg end
             previous_node = manager.IndexToNode(index)
@@ -256,29 +274,47 @@ def print_solution(params, data, manager, routing, solution):
             new_node = manager.IndexToNode(index)
 
             # Update total distance
-            leg_distance = int(data["distance_matrix"][previous_node][new_node]) / 1000
-            route_distance += leg_distance
+            route_leg["Distance"] = (
+                int(data["distance_matrix"][previous_node][new_node]) / 1000
+            )
+            route_distance += route_leg["Distance"]
 
+            # Compute next duration
+            previous_ETD = route_leg["ETD"]
+            next_leg_duration = int(data["time_matrix"][previous_node][new_node])
+
+            # Output
+            output_df = pd.concat(
+                [output_df, pd.DataFrame([route_leg])], ignore_index=True
+            )
             out_str += (
-                f"\tNode {node_index} ({node_label}): {activity} -> "
+                f"\tNode {node_index} ({route_leg['Stop ID']}): {route_leg['Action']} @ {route_leg['Stop type']} -> "
                 f"Current Load ({route_load:.2f}) -> "
-                f"ETD {time_min.time()} -> "
-                f"Drive {leg_distance:.3f} km to -->\n"
+                f"ETD {route_leg['ETD']} -> "
+                f"Drive {route_leg['Distance']:.3f} km to -->\n"
             )
 
         # Terminate route
         node_index = manager.IndexToNode(index)
-        node_label = params["stop_id_map"][node_index]
+        route_leg = {
+            "Stop ID": params["stop_id_map"][node_index],
+            "Action": "End journey",
+            "Stop type": "depot",
+        }
 
         time_var = time_dimension.CumulVar(index)
-        time_min = datetime.combine(date.min, params["leave_time"]) + timedelta(
-            seconds=solution.Min(time_var)
-        )
+        time_min = (
+            datetime.combine(date.min, params["leave_time"])
+            + timedelta(seconds=solution.Min(time_var))
+        ).time()
+        route_leg["ETA"] = time_min
         route_load += data["demands"][node_index]
 
+        # Output
+        output_df = pd.concat([output_df, pd.DataFrame([route_leg])], ignore_index=True)
         out_str += (
-            f"\tNode {node_index} ({node_label}): End journey @ depot -> "
-            f"ETA {time_min.time()} after serving "
+            f"\tNode {node_index} ({route_leg['Stop ID']}): {route_leg['Action']} @ {route_leg['Stop type']} -> "
+            f"ETA {route_leg['ETA']} after serving "
             f"{n_stores} stores, {n_customers} customers and {n_pickups} pickups.\n"
         )
         out_str += f"Total route distance: {route_distance:.3f} km.\n"
@@ -287,6 +323,7 @@ def print_solution(params, data, manager, routing, solution):
         out_str += f"Total route time: {route_time} min\n"
 
         if route_time > 0:
+            output_df_list.append(output_df)
             logger.info(out_str)
             vehicle_idx += 1
 
@@ -303,6 +340,13 @@ def print_solution(params, data, manager, routing, solution):
     logger.info(f"Sum of the route distances: {sum_total_distances:.3f} km.")
     logger.info(f"Longest route time: {max_route_time} min.")
     logger.info(f"Sum of the route durations: {sum_total_time} min.")
+
+    # Output tour list to file
+    writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
+    for idx, out_df in enumerate(output_df_list):
+        out_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
+
+    writer.save()
 
     return
 

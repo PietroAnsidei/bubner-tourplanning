@@ -20,7 +20,10 @@ def address_to_lat_lon(address):
 
     # In case of failure with the address, just add the town
     if location is None:
+        msg = f"Address {address} not found."
         address = ", ".join(address.split(", ")[1:])
+        msg += f" Replacing with {address}."
+        logger.warning(msg)
         location = geolocator.geocode(address)
 
     return location.latitude, location.longitude
@@ -40,6 +43,18 @@ def data_import(params):
 
     # Filter data by options
     df = stops_df.copy()
+
+    # Filter customer_id
+    if len(params["id_to_remove"]):
+        df = df[~df["Customer ID"].isin(params["id_to_remove"])].copy()
+
+    if len(params["pickup_to_remove"]):
+        df = df[
+            ~(
+                (df.Type == "Pickup")
+                & (df["Customer ID"].isin(params["pickup_to_remove"]))
+            )
+        ].copy()
 
     # Extract only delivery
     if params["only_delivery"]:
@@ -71,7 +86,7 @@ def data_import(params):
     df["delayed_time_to"] = df["Time to"].apply(
         lambda x: (
             datetime.combine(datetime.today(), x)
-            + timedelta(hours=params["pickup_delay_h"])
+            + timedelta(hours=params["pickup_opening_delay_h"])
         ).time()
     )
     df.loc[df.Type == "Pickup", "Time to"] = df.loc[
@@ -116,6 +131,7 @@ def data_import(params):
     )
 
     # Store data & response
+    df.reset_index(inplace=True)
     df.to_pickle(f"{params['data_folder']}/{params['data_locations']}")
     with open(f"{params['data_folder']}/{params['data_distances']}", "wb") as handle:
         pickle.dump(response, handle, protocol=pickle.HIGHEST_PROTOCOL)
