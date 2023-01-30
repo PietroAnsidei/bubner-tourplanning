@@ -209,3 +209,18 @@ def data_etl(params):
     ]
 
     return params, distances, durations
+
+
+def output_solution(params, routing):
+    """Output routing solution to file."""
+    # Define output file
+    writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
+
+    # Export each tour to a different sheet
+    for idx, out_df in enumerate(routing["solution"]):
+        out_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
+
+    # Close file
+    writer.close()
+
+    return

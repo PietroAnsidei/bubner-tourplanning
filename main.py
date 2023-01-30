@@ -1,6 +1,6 @@
 """Main optimizer."""
-from src.etl import data_etl
-from src.optimization import solve_vr
+from src.etl import data_etl, output_solution
+from src.optimization import repeat_tests, solve_vr
 from src.setup import setup_params
 
 if __name__ == "__main__":
@@ -11,7 +11,10 @@ if __name__ == "__main__":
     params, distances, durations = data_etl(params)
 
     # Solver
-    solve_vr(params, distances, durations)
+    if params["test_mode"]:
+        routing = repeat_tests(params, distances, durations)
+    else:
+        routing = solve_vr(params, distances, durations)
 
-# TODO: cover the following use cases:
-#  - add pickup constraints (should happen after delivery)
+    # Output results to file
+    output_solution(params, routing)
