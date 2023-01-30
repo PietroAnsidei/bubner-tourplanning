@@ -1,8 +1,10 @@
 """OrTools utilities."""
+import random
 from datetime import date, datetime, timedelta
 
 import pandas as pd
-from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+from ortools.constraint_solver import pywrapcp
+from tqdm import tqdm
 
 from src.setup import logger
 
@@ -192,26 +194,43 @@ def solver(params, routing):
     """Solve optimization problem."""
     # Setting first solution heuristic.
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC
+
+    strategy = (
+        random.choice(params["strategies"]) if params["test_mode"] else "AUTOMATIC"
     )
+    strategy_label = f"routing_enums_pb2.FirstSolutionStrategy.{strategy}"
+
+    local_search = (
+        random.choice(params["local_search"]) if params["test_mode"] else "AUTOMATIC"
+    )
+    local_search_label = f"routing_enums_pb2.LocalSearchMetaheuristic.{local_search}"
+
+    search_parameters.first_solution_strategy = eval(strategy_label)
+    search_parameters.local_search_metaheuristic = eval(local_search_label)
+
     search_parameters.time_limit.seconds = int(60 * params["max_search_time_min"])
 
     # Solve the problem.
     solution = routing.SolveWithParameters(search_parameters)
-    return solution
+    return solution, strategy, local_search
 
 
-def print_solution(params, data, manager, routing, solution):
+def print_solution(params, data, manager, routing, solution, strategy, local_search):
     """Print solution on console and file."""
     # Init constants
     time_dimension = routing.GetDimensionOrDie("Time")
 
-    max_route_distance = 0
-    sum_total_distances = 0
-    max_route_time = 0
-    sum_total_time = 0
-    vehicle_idx = 0
+    routing_solution = {
+        "max_route_distance": 0,
+        "sum_total_distances": 0,
+        "max_route_time": 0,
+        "sum_total_time": 0,
+        "no_vechicles": 0,
+        "strategy": strategy,
+        "local_search": local_search,
+        "solution": [],
+    }
+
     output_df_columns = ["Stop ID", "Stop type", "Action", "ETA", "ETD", "Distance"]
     output_df_base = pd.DataFrame(columns=output_df_columns)
     output_df_list = []
@@ -229,7 +248,7 @@ def print_solution(params, data, manager, routing, solution):
         next_leg_duration = None
         index = routing.Start(vehicle_id)
         output_df = output_df_base.copy()
-        out_str = f"Route for vehicle {vehicle_idx}:\n"
+        out_str = f"Route for vehicle {routing_solution['no_vechicles']}:\n"
 
         # Define next leg of the travel
         while not routing.IsEnd(index):
@@ -324,36 +343,46 @@ def print_solution(params, data, manager, routing, solution):
 
         if route_time > 0:
             output_df_list.append(output_df)
-            logger.info(out_str)
-            vehicle_idx += 1
+            routing_solution["no_vechicles"] += 1
+            if params["verbose"]:
+                logger.info(out_str)
 
         # Update distances
-        max_route_distance = max(route_distance, max_route_distance)
-        sum_total_distances += route_distance
+        routing_solution["max_route_distance"] = max(
+            route_distance, routing_solution["max_route_distance"]
+        )
+        routing_solution["sum_total_distances"] += route_distance
 
         # Update durations
-        max_route_time = max(route_time, max_route_time)
-        sum_total_time += route_time
+        routing_solution["max_route_time"] = max(
+            route_time, routing_solution["max_route_time"]
+        )
+        routing_solution["sum_total_time"] += route_time
 
-    logger.info(f"Total number of vehicles used: {vehicle_idx}.")
-    logger.info(f"Longest route distance: {max_route_distance:.3f} km.")
-    logger.info(f"Sum of the route distances: {sum_total_distances:.3f} km.")
-    logger.info(f"Longest route time: {max_route_time} min.")
-    logger.info(f"Sum of the route durations: {sum_total_time} min.")
+    if params["verbose"]:
+        logger.info(
+            f"Total number of vehicles used: {routing_solution['no_vechicles']}."
+        )
+        logger.info(
+            f"Longest route distance: {routing_solution['max_route_distance']:.3f} km."
+        )
+        logger.info(
+            f"Sum of the route distances: {routing_solution['sum_total_distances']:.3f} km."
+        )
+        logger.info(f"Longest route time: {routing_solution['max_route_time']} min.")
+        logger.info(
+            f"Sum of the route durations: {routing_solution['sum_total_time']} min."
+        )
 
-    # Output tour list to file
-    writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
-    for idx, out_df in enumerate(output_df_list):
-        out_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
+    routing_solution["solution"] = output_df_list
 
-    writer.save()
-
-    return
+    return routing_solution
 
 
 def solve_vr(params, distances, durations):
     """Solve generic parametrize VRP."""
-    logger.info("Starting optimization.")
+    if params["verbose"]:
+        logger.info("Starting optimization.")
 
     # Instantiate the data model.
     data_ort = create_data_model(
@@ -386,12 +415,46 @@ def solve_vr(params, distances, durations):
         routing = constrain_pickup(params, manager, routing, time_dim, data_ort)
 
     # Compute solution
-    solution = solver(params, routing)
+    solution, strategy, local_search = solver(params, routing)
 
     # Print solution on console.
     if solution:
-        print_solution(params, data_ort, manager, routing, solution)
+        routing = print_solution(
+            params, data_ort, manager, routing, solution, strategy, local_search
+        )
     else:
-        logger.warning("No solution found!")
+        routing = None
+        if params["verbose"]:
+            logger.warning("No solution found!")
 
-    return
+    return routing
+
+
+def repeat_tests(params, distances, durations):
+    """Execute repeated tests."""
+    # Initialize output
+    full_tests = []
+
+    # Execute round of testing
+    for _ in tqdm(range(params["num_test"])):
+        attempt = solve_vr(params, distances, durations)
+        if attempt is not None:
+            full_tests.append(attempt)
+
+    # Compute performances
+    performances = pd.DataFrame.from_records(
+        [
+            {k: v for k, v in solution.items() if k != "solution"}
+            for solution in full_tests
+        ]
+    )
+    performances.to_csv(f"{params['data_folder']}/{params['output_test_file']}")
+
+    # Return best output
+    idx_best_solution = (
+        performances.sum_total_distances.idxmin()
+        if params["solve_by_distance"]
+        else performances.sum_total_time.idxmin()
+    )
+
+    return full_tests[idx_best_solution]
