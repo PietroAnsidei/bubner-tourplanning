@@ -459,6 +459,7 @@ def solve_vr(params, distances, durations):
 
 def repeat_tests(params, distances, durations):
     """Execute repeated tests."""
+    logger.info(f"Executing {params['num_test']} optimization instances...")
     # Initialize results
     full_tests = []
 
