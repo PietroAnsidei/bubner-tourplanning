@@ -213,14 +213,15 @@ def data_etl(params):
 
 def output_solution(params, routing):
     """Output routing solution to file."""
-    # Define output file
-    writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
+    if "solution" in routing and len(routing["solution"]):
+        # Define output file
+        writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
 
-    # Export each tour to a different sheet
-    for idx, out_df in enumerate(routing["solution"]):
-        out_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
+        # Export each tour to a different sheet
+        for idx, out_df in enumerate(routing["solution"]):
+            out_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
 
-    # Close file
-    writer.close()
+        # Close file
+        writer.close()
 
     return

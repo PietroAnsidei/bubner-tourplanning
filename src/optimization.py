@@ -484,10 +484,15 @@ def repeat_tests(params, distances, durations):
     performances.to_csv(f"{params['data_folder']}/{params['output_test_file']}")
 
     # Return best output
-    idx_best_solution = (
-        performances.sum_total_distances.idxmin()
-        if params["solve_by_distance"]
-        else performances.sum_total_time.idxmin()
-    )
+    performances = performances.query("no_vehicles > 0")
+    if performances.shape[0]:
+        idx_best_solution = (
+            performances.sum_total_distances.idxmin()
+            if params["solve_by_distance"]
+            else performances.sum_total_time.idxmin()
+        )
+        result = full_tests[idx_best_solution]
+    else:
+        result = {"solution": []}
 
-    return full_tests[idx_best_solution]
+    return result
