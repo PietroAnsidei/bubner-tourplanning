@@ -1,9 +1,11 @@
 """OrTools utilities."""
+import concurrent.futures
 import random
 from datetime import date, datetime, timedelta
+from time import process_time
 
 import pandas as pd
-from ortools.constraint_solver import pywrapcp
+from ortools.constraint_solver import pywrapcp, routing_enums_pb2  # noqa: F401
 from tqdm import tqdm
 
 from src.setup import logger
@@ -205,17 +207,24 @@ def solver(params, routing):
     )
     local_search_label = f"routing_enums_pb2.LocalSearchMetaheuristic.{local_search}"
 
+    duration = random.randrange(params["max_search_time_min"] + 1)
+
     search_parameters.first_solution_strategy = eval(strategy_label)
     search_parameters.local_search_metaheuristic = eval(local_search_label)
-
-    search_parameters.time_limit.seconds = int(60 * params["max_search_time_min"])
+    search_parameters.time_limit.seconds = int(60 * duration)
 
     # Solve the problem.
+    t_start = process_time()
     solution = routing.SolveWithParameters(search_parameters)
-    return solution, strategy, local_search
+    t_end = process_time()
+    opt_duration = t_end - t_start
+
+    return solution, strategy, local_search, opt_duration
 
 
-def print_solution(params, data, manager, routing, solution, strategy, local_search):
+def print_solution(
+    params, data, manager, routing, solution, strategy, local_search, opt_duration
+):
     """Print solution on console and file."""
     # Init constants
     time_dimension = routing.GetDimensionOrDie("Time")
@@ -225,9 +234,10 @@ def print_solution(params, data, manager, routing, solution, strategy, local_sea
         "sum_total_distances": 0,
         "max_route_time": 0,
         "sum_total_time": 0,
-        "no_vechicles": 0,
+        "no_vehicles": 0,
         "strategy": strategy,
         "local_search": local_search,
+        "duration": opt_duration,
         "solution": [],
     }
 
@@ -248,7 +258,7 @@ def print_solution(params, data, manager, routing, solution, strategy, local_sea
         next_leg_duration = None
         index = routing.Start(vehicle_id)
         output_df = output_df_base.copy()
-        out_str = f"Route for vehicle {routing_solution['no_vechicles']}:\n"
+        out_str = f"Route for vehicle {routing_solution['no_vehicles']}:\n"
 
         # Define next leg of the travel
         while not routing.IsEnd(index):
@@ -343,7 +353,7 @@ def print_solution(params, data, manager, routing, solution, strategy, local_sea
 
         if route_time > 0:
             output_df_list.append(output_df)
-            routing_solution["no_vechicles"] += 1
+            routing_solution["no_vehicles"] += 1
             if params["verbose"]:
                 logger.info(out_str)
 
@@ -361,7 +371,7 @@ def print_solution(params, data, manager, routing, solution, strategy, local_sea
 
     if params["verbose"]:
         logger.info(
-            f"Total number of vehicles used: {routing_solution['no_vechicles']}."
+            f"Total number of vehicles used: {routing_solution['no_vehicles']}."
         )
         logger.info(
             f"Longest route distance: {routing_solution['max_route_distance']:.3f} km."
@@ -415,31 +425,54 @@ def solve_vr(params, distances, durations):
         routing = constrain_pickup(params, manager, routing, time_dim, data_ort)
 
     # Compute solution
-    solution, strategy, local_search = solver(params, routing)
+    solution, strategy, local_search, opt_duration = solver(params, routing)
 
     # Print solution on console.
     if solution:
-        routing = print_solution(
-            params, data_ort, manager, routing, solution, strategy, local_search
+        routing_solution = print_solution(
+            params,
+            data_ort,
+            manager,
+            routing,
+            solution,
+            strategy,
+            local_search,
+            opt_duration,
         )
     else:
-        routing = None
+        routing_solution = {
+            "max_route_distance": 0,
+            "sum_total_distances": 0,
+            "max_route_time": 0,
+            "sum_total_time": 0,
+            "no_vehicles": 0,
+            "strategy": strategy,
+            "local_search": local_search,
+            "duration": opt_duration,
+            "solution": [],
+        }
         if params["verbose"]:
             logger.warning("No solution found!")
 
-    return routing
+    return routing_solution
 
 
 def repeat_tests(params, distances, durations):
     """Execute repeated tests."""
-    # Initialize output
+    logger.info(f"Executing {params['num_test']} optimization instances...")
+    # Initialize results
     full_tests = []
 
-    # Execute round of testing
-    for _ in tqdm(range(params["num_test"])):
-        attempt = solve_vr(params, distances, durations)
-        if attempt is not None:
-            full_tests.append(attempt)
+    with tqdm(total=params["num_test"]) as pbar:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(solve_vr, params, distances, durations)
+                for _ in range(params["num_test"])
+            }
+
+            for future in concurrent.futures.as_completed(futures):
+                full_tests.append(future.result())
+                pbar.update()
 
     # Compute performances
     performances = pd.DataFrame.from_records(
@@ -451,10 +484,15 @@ def repeat_tests(params, distances, durations):
     performances.to_csv(f"{params['data_folder']}/{params['output_test_file']}")
 
     # Return best output
-    idx_best_solution = (
-        performances.sum_total_distances.idxmin()
-        if params["solve_by_distance"]
-        else performances.sum_total_time.idxmin()
-    )
+    performances = performances.query("no_vehicles > 0")
+    if performances.shape[0]:
+        idx_best_solution = (
+            performances.sum_total_distances.idxmin()
+            if params["solve_by_distance"]
+            else performances.sum_total_time.idxmin()
+        )
+        result = full_tests[idx_best_solution]
+    else:
+        result = {"solution": []}
 
-    return full_tests[idx_best_solution]
+    return result

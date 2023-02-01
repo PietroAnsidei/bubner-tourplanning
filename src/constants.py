@@ -4,7 +4,7 @@ from datetime import time
 params = {
     # Test mode
     "test_mode": True,
-    "num_test": 100,
+    "num_test": 1000,
     "verbose": False,
     "strategies": [
         # 'AUTOMATIC',  # works
@@ -31,6 +31,7 @@ params = {
     "data_distances": "osrm_response.pkl",
     "output_file": "Output.xlsx",
     "output_test_file": "Test.csv",
+    "output_test_plot": "Test_plot.png",
     # ETL
     "reload": True,
     "data_sheet": "Stops 1.Tour (Mo-Fr)",
@@ -48,7 +49,7 @@ params = {
     "constrain_tw": True,
     "constrain_cap": True,
     # Maximum execution time
-    "max_search_time_min": 3,
+    "max_search_time_min": 10,
     # Requirements
     "num_vehicles": 10,
     "max_legs": 4.44,  # Allow 4 store- (1), 4 customer- (0.1), 4 pickup-legs(0.01)
