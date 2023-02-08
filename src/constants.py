@@ -3,9 +3,9 @@ from datetime import time
 
 params = {
     # Test mode
-    "test_mode": True,
+    "test_mode": False,
     "num_test": 1000,
-    "verbose": False,
+    "verbose": True,
     "strategies": [
         # 'AUTOMATIC',  # works
         "PATH_CHEAPEST_ARC",  # timeout
@@ -30,6 +30,7 @@ params = {
     "data_locations": "osrm_data.pkl",
     "data_distances": "osrm_response.pkl",
     "output_file": "Output.xlsx",
+    "output_map": "Tour_map.html",
     "output_test_file": "Test.csv",
     "output_test_plot": "Test_plot.png",
     # ETL
@@ -62,6 +63,6 @@ params = {
     "slack_time_max_h": 4,  # Max allowed stopping time at location
     "min_pickup_delay_h": 0.5,  # min pickup delay
     # Comparison health check
-    "id_to_remove": [],  # ['141', '142', '143', '144', '145', '146', '9008', '9027'],
-    "pickup_to_remove": [],  # ['9023']
+    "id_to_remove": [],  # ["141", "142", "143", "144", "145", "146", "9008", "9027"],
+    "pickup_to_remove": [],  # ["9023"],
 }

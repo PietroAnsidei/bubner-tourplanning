@@ -2,7 +2,10 @@
 import os
 import pickle
 from datetime import date, datetime, timedelta
+from random import randrange
 
+import folium
+import numpy as np
 import pandas as pd
 import requests
 from geopy.geocoders import Nominatim
@@ -208,20 +211,93 @@ def data_etl(params):
         if loc.Type == "Pickup"
     ]
 
-    return params, distances, durations
+    return params, df, distances, durations
 
 
-def output_solution(params, routing):
+def output_solution(params, stop_df, routing):
     """Output routing solution to file."""
     if "solution" in routing and len(routing["solution"]):
         # Define output file
         writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
 
-        # Export each tour to a different sheet
-        for idx, out_df in enumerate(routing["solution"]):
-            out_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
+        # Create map
+        depot_coordinates = [
+            float(n_string) for n_string in params["start_loc"][0].split(",")
+        ][::-1]
+        routing_map = folium.Map(location=depot_coordinates)
 
-        # Close file
+        # Add depot icon to map
+        folium.Marker(
+            location=depot_coordinates,
+            tooltip="Depot",
+            icon=folium.Icon(icon="fa-solid fa-warehouse", prefix="fa"),
+        ).add_to(routing_map)
+        visited_IDs = ["depot"]
+
+        # Export each tour separately
+        for idx_tour, tour_df in enumerate(routing["solution"]):
+
+            # Create one sheet per tour
+            tour_df.to_excel(writer, sheet_name=f"Tour {idx_tour+1}")
+
+            # Initialize tour paths
+            last_coordinates = depot_coordinates
+            last_ETD = datetime.combine(date.today(), params["leave_time"])
+            last_leg_distance = 0
+
+            # Draw tour path map with a random color
+            tour_color = "#" + hex(randrange(0, 2**24))[2:]
+            for idx_stop, stop in tour_df.iterrows():
+
+                # Identify stop ID, location, ETA and last leg duration
+                curr_stop_ID = stop["Stop ID"]
+                curr_coordinates = (
+                    depot_coordinates
+                    if curr_stop_ID == "depot"
+                    else stop_df[stop_df["Customer ID"] == curr_stop_ID][
+                        ["Latitude", "Longitude"]
+                    ]
+                    .iloc[0, :]
+                    .tolist()
+                )
+                curr_ETA = (
+                    last_ETD
+                    if idx_stop == 0
+                    else datetime.combine(date.today(), stop.ETA)
+                )
+                last_duration = int(
+                    np.round((curr_ETA - last_ETD).total_seconds() / 60)
+                )
+
+                # Add customer icon to map if not already visited
+                if curr_stop_ID not in visited_IDs:
+                    folium.Marker(
+                        location=curr_coordinates,
+                        tooltip=f"Customer # {curr_stop_ID}",
+                        icon=folium.Icon(icon="fa-solid fa-shop", prefix="fa"),
+                    ).add_to(routing_map)
+
+                # Add path between last and current leg
+                if curr_coordinates != last_coordinates:
+                    msg = f"Tour # {idx_tour+1} Leg # {idx_stop} - {last_leg_distance:.2f} km - {last_duration} min"
+                    folium.PolyLine(
+                        locations=[last_coordinates, curr_coordinates],
+                        tooltip=msg,
+                        color=tour_color,
+                    ).add_to(routing_map)
+
+                # Store stop location, ETD and next leg distance
+                last_coordinates = curr_coordinates
+                last_ETD = (
+                    datetime.combine(date.today(), stop.ETD)
+                    if stop.ETD == stop.ETD
+                    else None
+                )
+                last_leg_distance = stop.Distance
+                visited_IDs.append(curr_stop_ID)
+
+        # Close files
         writer.close()
+        routing_map.save(f"{params['data_folder']}/{params['output_map']}")
 
     return

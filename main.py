@@ -8,7 +8,7 @@ if __name__ == "__main__":
     params = setup_params()
 
     # ETL
-    params, distances, durations = data_etl(params)
+    params, df, distances, durations = data_etl(params)
 
     # Solver
     if params["test_mode"]:
@@ -17,4 +17,4 @@ if __name__ == "__main__":
         routing = solve_vr(params, distances, durations)
 
     # Output results to file
-    output_solution(params, routing)
+    output_solution(params, df, routing)

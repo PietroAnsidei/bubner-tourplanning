@@ -198,16 +198,24 @@ def solver(params, routing):
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
 
     strategy = (
-        random.choice(params["strategies"]) if params["test_mode"] else "AUTOMATIC"
+        random.choice(params["strategies"])
+        if params["test_mode"]
+        else "PARALLEL_CHEAPEST_INSERTION"  # "AUTOMATIC"
     )
     strategy_label = f"routing_enums_pb2.FirstSolutionStrategy.{strategy}"
 
     local_search = (
-        random.choice(params["local_search"]) if params["test_mode"] else "AUTOMATIC"
+        random.choice(params["local_search"])
+        if params["test_mode"]
+        else "TABU_SEARCH"  # "AUTOMATIC"
     )
     local_search_label = f"routing_enums_pb2.LocalSearchMetaheuristic.{local_search}"
 
-    duration = random.randrange(params["max_search_time_min"] + 1)
+    duration = (
+        random.randrange(params["max_search_time_min"] + 1)
+        if params["test_mode"]
+        else params["max_search_time_min"]
+    )
 
     search_parameters.first_solution_strategy = eval(strategy_label)
     search_parameters.local_search_metaheuristic = eval(local_search_label)
