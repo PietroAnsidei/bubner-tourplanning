@@ -235,10 +235,10 @@ def output_solution(params, stop_df, routing):
         visited_IDs = ["depot"]
 
         # Export each tour separately
-        for idx, tour_df in enumerate(routing["solution"]):
+        for idx_tour, tour_df in enumerate(routing["solution"]):
 
             # Create one sheet per tour
-            tour_df.to_excel(writer, sheet_name=f"Tour {idx+1}")
+            tour_df.to_excel(writer, sheet_name=f"Tour {idx_tour+1}")
 
             # Initialize tour paths
             last_coordinates = depot_coordinates
@@ -262,7 +262,7 @@ def output_solution(params, stop_df, routing):
                 )
                 curr_ETA = (
                     last_ETD
-                    if curr_stop_ID == "depot"
+                    if idx_stop == 0
                     else datetime.combine(date.today(), stop.ETA)
                 )
                 last_duration = int(
@@ -279,9 +279,10 @@ def output_solution(params, stop_df, routing):
 
                 # Add path between last and current leg
                 if curr_coordinates != last_coordinates:
+                    msg = f"Tour # {idx_tour+1} Leg # {idx_stop} - {last_leg_distance:.2f} km - {last_duration} min"
                     folium.PolyLine(
                         locations=[last_coordinates, curr_coordinates],
-                        tooltip=f"Tour # {idx+1} Leg # {idx_stop} - {last_leg_distance:.2f} km - {last_duration} min",
+                        tooltip=msg,
                         color=tour_color,
                     ).add_to(routing_map)
 

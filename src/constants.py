@@ -3,9 +3,9 @@ from datetime import time
 
 params = {
     # Test mode
-    "test_mode": True,
+    "test_mode": False,
     "num_test": 1000,
-    "verbose": False,
+    "verbose": True,
     "strategies": [
         # 'AUTOMATIC',  # works
         "PATH_CHEAPEST_ARC",  # timeout
