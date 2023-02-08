@@ -7,3 +7,4 @@ Bakery_tours*
 .idea/*
 cache/
 cache/*
+**/__pycache__
