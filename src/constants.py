@@ -63,6 +63,6 @@ params = {
     "slack_time_max_h": 4,  # Max allowed stopping time at location
     "min_pickup_delay_h": 0.5,  # min pickup delay
     # Comparison health check
-    "id_to_remove": ["141", "142", "143", "144", "145", "146", "9008", "9027"],  # []
-    "pickup_to_remove": ["9023"],  # []
+    "id_to_remove": [],  # ["141", "142", "143", "144", "145", "146", "9008", "9027"],
+    "pickup_to_remove": [],  # ["9023"],
 }
