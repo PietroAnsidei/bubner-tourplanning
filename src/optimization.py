@@ -200,14 +200,14 @@ def solver(params, routing):
     strategy = (
         random.choice(params["strategies"])
         if params["test_mode"]
-        else "PARALLEL_CHEAPEST_INSERTION"  # "AUTOMATIC"
+        else "AUTOMATIC"  # "PARALLEL_CHEAPEST_INSERTION"
     )
     strategy_label = f"routing_enums_pb2.FirstSolutionStrategy.{strategy}"
 
     local_search = (
         random.choice(params["local_search"])
         if params["test_mode"]
-        else "TABU_SEARCH"  # "AUTOMATIC"
+        else "AUTOMATIC"  # "TABU_SEARCH"
     )
     local_search_label = f"routing_enums_pb2.LocalSearchMetaheuristic.{local_search}"
 
