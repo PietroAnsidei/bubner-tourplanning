@@ -26,16 +26,20 @@ params = {
     ],
     # Define paths
     "data_folder": "data",
-    "data_file": "Data.xlsx",
-    "data_locations": "osrm_data.pkl",
-    "data_distances": "osrm_response.pkl",
-    "output_file": "Output.xlsx",
-    "output_map": "Tour_map.html",
+    "data_file": "Data collection_v4.xlsx",
+    "data_locations": "osrm_data",
+    "data_distances": "osrm_response",
     "output_test_file": "Test.csv",
     "output_test_plot": "Test_plot.png",
     # ETL
     "reload": True,
-    "data_sheet": "Stops 1.Tour (Mo-Fr)",
+    "data_sheet": [
+        "Stops 1.Tour (Mo-Fr)",
+        "Stops 2.Tour (Mo-Fr)",
+        "Saturday 1. Tour",
+        "Saturday 2.Tour",
+        "Sunday tours",
+    ],
     "only_stores": False,
     "only_delivery": False,
     # Coordinates of the production centre at Gewerbegebiet Südstraße 5
@@ -54,15 +58,15 @@ params = {
     # Requirements
     "num_vehicles": 10,
     "max_legs": 4.44,  # Allow 4 store- (1), 4 customer- (0.1), 4 pickup-legs(0.01)
-    "leave_time": time(2, 45),
-    "max_time_tour_h": 6,
+    "leave_times": [time(2, 45), time(8, 00)],
+    "max_time_tour_h": 9,
     "pickup_opening_delay_h": 6,  # Allow max delay on the ETA (Time to) for pickup
     # Other parameters
-    "max_distance_vehicles_km": 300,  # For each vehicle's route
+    "max_distance_vehicles_km": 2000,  # For each vehicle's route
     "pen_distance_vehicle_factor": 0,  # To penalize the max of the routes lengths
     "slack_time_max_h": 4,  # Max allowed stopping time at location
     "min_pickup_delay_h": 0.5,  # min pickup delay
     # Comparison health check
-    "id_to_remove": [],  # ["141", "142", "143", "144", "145", "146", "9008", "9027"],
+    "id_to_remove": [],  # ["141", "142", "143", "144", "145", "146"],
     "pickup_to_remove": [],  # ["9023"],
 }

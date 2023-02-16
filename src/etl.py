@@ -32,14 +32,14 @@ def address_to_lat_lon(address):
     return location.latitude, location.longitude
 
 
-def data_import(params):
+def data_import(params, day_id):
     """Import and preprocess data."""
-    logger.info("Importing data from source.")
+    logger.info(f"Importing {day_id} data from source.")
 
     # Import data
     stops_df = pd.read_excel(
         f"{params['data_folder']}/{params['data_file']}",
-        sheet_name=params["data_sheet"],
+        sheet_name=day_id,
         engine="openpyxl",
         converters={"Customer ID": str, "Postal Code": str, "Dependency": int},
     )
@@ -135,21 +135,27 @@ def data_import(params):
 
     # Store data & response
     df.reset_index(inplace=True)
-    df.to_pickle(f"{params['data_folder']}/{params['data_locations']}")
-    with open(f"{params['data_folder']}/{params['data_distances']}", "wb") as handle:
+    df.to_pickle(f"{params['data_folder']}/{params['data_locations']}_{day_id}.pkl")
+    with open(
+        f"{params['data_folder']}/{params['data_distances']}_{day_id}.pkl", "wb"
+    ) as handle:
         pickle.dump(response, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     return df, response
 
 
-def data_load(params):
+def data_load(params, day_id):
     """Load data from storage."""
-    logger.info("Loading data from storage.")
+    logger.info(f"Loading {day_id} data from storage.")
     # Fetch data
-    df = pd.read_pickle(f"{params['data_folder']}/{params['data_locations']}")
+    df = pd.read_pickle(
+        f"{params['data_folder']}/{params['data_locations']}_{day_id}.pkl"
+    )
 
     # Fetch response
-    with open(f"{params['data_folder']}/{params['data_distances']}", "rb") as handle:
+    with open(
+        f"{params['data_folder']}/{params['data_distances']}_{day_id}.pkl", "rb"
+    ) as handle:
         response = pickle.load(handle)
 
     return df, response
@@ -165,17 +171,26 @@ def delay_from_leave_time(params, ts):
     )
 
 
-def data_etl(params):
+def data_etl(params, day_id):
     """Preprocess data."""
     # Import data from file (if existing and not required differently)
     if (
-        os.path.exists(f"{params['data_folder']}/{params['data_locations']}")
-        and os.path.exists(f"{params['data_folder']}/{params['data_distances']}")
+        os.path.exists(
+            f"{params['data_folder']}/{params['data_locations']}_{day_id}.pkl"
+        )
+        and os.path.exists(
+            f"{params['data_folder']}/{params['data_distances']}_{day_id}.pkl"
+        )
         and not params["reload"]
     ):
-        df, response = data_load(params)
+        df, response = data_load(params, day_id)
     else:
-        df, response = data_import(params)
+        df, response = data_import(params, day_id)
+
+    # Define leave time
+    params["leave_time"] = (
+        params["leave_times"][1] if "2" in day_id else params["leave_times"][0]
+    )
 
     # Extract store info-id
     params["stop_id_map"] = {
@@ -214,11 +229,11 @@ def data_etl(params):
     return params, df, distances, durations
 
 
-def output_solution(params, stop_df, routing):
+def output_solution(params, day_id, stop_df, routing):
     """Output routing solution to file."""
     if "solution" in routing and len(routing["solution"]):
         # Define output file
-        writer = pd.ExcelWriter(f"{params['data_folder']}/{params['output_file']}")
+        writer = pd.ExcelWriter(f"{params['data_folder']}/{day_id}.xlsx")
 
         # Create map
         depot_coordinates = [
@@ -298,6 +313,6 @@ def output_solution(params, stop_df, routing):
 
         # Close files
         writer.close()
-        routing_map.save(f"{params['data_folder']}/{params['output_map']}")
+        routing_map.save(f"{params['data_folder']}/{day_id}.html")
 
     return
